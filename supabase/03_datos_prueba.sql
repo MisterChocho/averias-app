@@ -82,9 +82,9 @@ join public.zonas z on
 --    Al crearlos, el trigger les pone rol 'cliente' por defecto.
 -- 2. Luego ejecuta este bloque para asignar roles y enlazar cuentas:
 -- =====================================================================
--- update public.perfiles set rol = 'agente',  nombre_completo = 'Agente Demo'  where correo = 'agente@demo.com';
--- update public.perfiles set rol = 'gerente', nombre_completo = 'Gerente Demo' where correo = 'gerente@demo.com';
--- update public.perfiles set rol = 'tecnico', nombre_completo = 'Raúl Paz'     where correo = 'tecnico@demo.com';
--- update public.perfiles set nombre_completo = 'María Ríos'                    where correo = 'cliente@demo.com';
--- update public.tecnicos set perfil_id = (select id from public.perfiles where correo = 'tecnico@demo.com') where dni = '45123456';
--- update public.clientes set perfil_id = (select id from public.perfiles where correo = 'cliente@demo.com') where documento = '70123456';
+--update public.perfiles set rol = 'agente',  nombre_completo = 'Agente Demo'  where correo = 'agente@demo.com';
+--update public.perfiles set rol = 'gerente', nombre_completo = 'Gerente Demo' where correo = 'gerente@demo.com';
+--update public.perfiles set rol = 'tecnico', nombre_completo = 'Raúl Paz'     where correo = 'tecnico@demo.com';
+--update public.perfiles set nombre_completo = 'María Ríos'                    where correo = 'cliente@demo.com';
+--update public.tecnicos set perfil_id = (select id from public.perfiles where correo = 'tecnico@demo.com') where dni = '45123456';
+--update public.clientes set perfil_id = (select id from public.perfiles where correo = 'cliente@demo.com') where documento = '70123456';
