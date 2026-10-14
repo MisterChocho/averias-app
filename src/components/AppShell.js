@@ -40,7 +40,7 @@ export default function AppShell({ perfil, children }) {
           <MenuLateral inicio={`/${perfil.rol}`} menu={menu} />
         </div>
         <div className="hidden border-t border-white/10 p-4 lg:block">
-          <p className="text-xs text-slate-500">Grupo 04 · Agile Development</p>
+          <p className="text-xs text-slate-500">Orsted Corp · v1.0</p>
         </div>
       </aside>
 

@@ -47,7 +47,7 @@ export default function LoginPage() {
           </ul>
         </div>
 
-        <p className="relative text-xs text-slate-500">Grupo 04 · Agile Development · UPAO 2026</p>
+        <p className="relative text-xs text-slate-500">© 2026 Orsted Corp. Todos los derechos reservados.</p>
       </section>
 
       {/* Formulario */}

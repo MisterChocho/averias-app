@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { MENUS } from "@/lib/menus";
 import Icono from "./Icono";
-import { Encabezado, Insignia } from "./ui";
+import { Encabezado } from "./ui";
 
 function saludo() {
   const hora = Number(new Date().toLocaleString("en-US", { hour: "numeric", hour12: false, timeZone: "America/Lima" }));
@@ -18,7 +18,7 @@ export default function PanelRol({ perfil }) {
       <Encabezado
         etiqueta="Panel principal"
         titulo={`${saludo()}, ${nombre}`}
-        descripcion="Elige un módulo para empezar. Cada uno corresponde a las historias de usuario del proyecto."
+        descripcion="Elige un módulo para empezar."
       />
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -33,14 +33,9 @@ export default function PanelRol({ perfil }) {
             </span>
             <span className="mt-5 text-base font-semibold text-slate-900">{item.label}</span>
             <span className="mt-1 flex-1 text-sm text-slate-500">{item.descripcion}</span>
-            <span className="mt-5 flex items-center justify-between">
-              <span className="flex flex-wrap gap-1.5">
-                {item.hu.map((hu) => (
-                  <Insignia key={hu}>{hu}</Insignia>
-                ))}
-                <Insignia tono={item.sprint === 1 ? "azul" : "gris"}>Sprint {item.sprint}</Insignia>
-              </span>
-              <Icono nombre="flecha" className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-marca-600" />
+            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-marca-600">
+              Abrir módulo
+              <Icono nombre="flecha" className="h-4 w-4 transition group-hover:translate-x-0.5" />
             </span>
           </Link>
         ))}

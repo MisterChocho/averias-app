@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "Atención de averías",
-  description: "Sistema de gestión de técnicos y órdenes de servicio - Grupo 04",
+  description: "Sistema de gestión de técnicos y órdenes de servicio",
 };
 
 export default function RootLayout({ children }) {

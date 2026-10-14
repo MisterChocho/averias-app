@@ -27,11 +27,6 @@ export default function MenuLateral({ inicio, menu }) {
               className={`h-5 w-5 ${activo ? "text-marca-200" : "text-slate-500 group-hover:text-slate-300"}`}
             />
             {item.label}
-            {item.sprint > 1 && (
-              <span className="ml-auto hidden rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 lg:inline">
-                S{item.sprint}
-              </span>
-            )}
           </Link>
         );
       })}
