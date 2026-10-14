@@ -1,48 +1,69 @@
-// Estructura común de todas las pantallas internas: barra superior + menú lateral del rol.
+// Estructura común de todas las pantallas internas: menú lateral del rol + barra superior.
 import Link from "next/link";
 import { ROLES } from "@/lib/auth";
 import { MENUS } from "@/lib/menus";
+import MenuLateral from "./MenuLateral";
+import Icono from "./Icono";
+import { Avatar } from "./ui";
+
+export function Logo({ claro }) {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-marca-500 to-marca-700 text-white shadow-lg shadow-marca-900/30">
+        <Icono nombre="rayo" className="h-5 w-5" strokeWidth={2} />
+      </span>
+      <span className="leading-tight">
+        <span className={`block text-sm font-semibold ${claro ? "text-white" : "text-slate-900"}`}>Orsted Averías</span>
+        <span className={`block text-xs ${claro ? "text-slate-400" : "text-slate-500"}`}>Gestión de atención técnica</span>
+      </span>
+    </span>
+  );
+}
 
 export default function AppShell({ perfil, children }) {
   const menu = MENUS[perfil.rol] || [];
+  const nombre = perfil.nombre_completo || perfil.correo;
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
-        <Link href={`/${perfil.rol}`} className="font-semibold text-slate-900">
-          Atención de averías
-        </Link>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="hidden text-right sm:block">
-            <span className="block font-medium text-slate-800">
-              {perfil.nombre_completo || perfil.correo}
-            </span>
-            <span className="block text-xs text-slate-500">{ROLES[perfil.rol]}</span>
-          </span>
+    <div className="min-h-screen lg:flex">
+      {/* Menú lateral */}
+      <aside className="bg-tinta lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+        <div className="px-5 py-4 lg:py-6">
+          <Link href={`/${perfil.rol}`}>
+            <Logo claro />
+          </Link>
+        </div>
+        <div className="px-3 pb-3 lg:flex-1">
+          <p className="mb-2 hidden px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 lg:block">
+            {ROLES[perfil.rol]}
+          </p>
+          <MenuLateral inicio={`/${perfil.rol}`} menu={menu} />
+        </div>
+        <div className="hidden border-t border-white/10 p-4 lg:block">
+          <p className="text-xs text-slate-500">Grupo 04 · Agile Development</p>
+        </div>
+      </aside>
+
+      {/* Contenido */}
+      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-end gap-4 border-b border-slate-200 bg-white/80 px-4 backdrop-blur sm:px-8">
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p className="text-sm font-medium text-slate-900">{nombre}</p>
+              <p className="text-xs text-slate-500">{ROLES[perfil.rol]}</p>
+            </div>
+            <Avatar nombre={nombre} />
+          </div>
+          <span className="h-6 w-px bg-slate-200" />
           <form action="/auth/salir" method="post">
-            <button className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-50">
+            <button className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+              <Icono nombre="salir" className="h-4 w-4" />
               Salir
             </button>
           </form>
-        </div>
-      </header>
+        </header>
 
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4 md:flex-row">
-        <nav className="flex gap-2 overflow-x-auto md:w-56 md:flex-col md:overflow-visible">
-          {menu.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="whitespace-nowrap rounded-md bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200 hover:bg-blue-50 hover:text-blue-700"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        <main className="min-w-0 flex-1 rounded-xl bg-white p-6 ring-1 ring-slate-200">
-          {children}
-        </main>
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-8">{children}</main>
       </div>
     </div>
   );

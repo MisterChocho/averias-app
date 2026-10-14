@@ -5,17 +5,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { registrarOrden } from "../actions";
+import Icono from "@/components/Icono";
+import { Tarjeta, Aviso, Avatar, Dato, Insignia, Etiqueta, ErrorCampo, btn, campo } from "@/components/ui";
 
 const TELEFONO_VALIDO = /^[0-9]{9}$/;
-
-function Dato({ etiqueta, valor }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-slate-500">{etiqueta}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{valor || "—"}</dd>
-    </div>
-  );
-}
 
 export default function FormularioOrden({ datos }) {
   const router = useRouter();
@@ -57,111 +50,115 @@ export default function FormularioOrden({ datos }) {
     });
   }
 
-  const claseCampo = (campo) =>
-    `mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none ${
-      errores[campo] ? "border-red-500 bg-red-50" : "border-slate-300 focus:border-blue-600"
-    }`;
-
   return (
-    <form onSubmit={pedirConfirmacion} className="space-y-6">
+    <form onSubmit={pedirConfirmacion} className="grid gap-6 lg:grid-cols-3">
+      <div className="space-y-6 lg:col-span-2">
+        {/* Datos editables de la orden */}
+        <Tarjeta titulo="Datos de la visita" descripcion="Se precargan con los datos del cliente; puedes corregirlos." icono="ubicacion">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Etiqueta htmlFor="direccion" obligatorio>
+                Dirección de atención
+              </Etiqueta>
+              <input
+                id="direccion"
+                value={direccion}
+                onChange={(e) => setDireccion(e.target.value)}
+                className={campo(errores.direccion)}
+              />
+              <ErrorCampo>{errores.direccion}</ErrorCampo>
+            </div>
+
+            <div>
+              <Etiqueta htmlFor="telefono" obligatorio>
+                Teléfono de contacto
+              </Etiqueta>
+              <input
+                id="telefono"
+                inputMode="numeric"
+                maxLength={9}
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value.replace(/[^0-9]/g, ""))}
+                className={campo(errores.telefono)}
+              />
+              <ErrorCampo>{errores.telefono}</ErrorCampo>
+            </div>
+
+            <div>
+              <Etiqueta htmlFor="horario" opcional>
+                Horario preferido
+              </Etiqueta>
+              <input
+                id="horario"
+                value={horario}
+                onChange={(e) => setHorario(e.target.value)}
+                placeholder="Ej.: Mañanas de 9 a 12"
+                className={campo(false)}
+              />
+            </div>
+          </div>
+        </Tarjeta>
+
+        {error && <Aviso tipo="error">{error}</Aviso>}
+
+        {!confirmando ? (
+          <div className="flex justify-end">
+            <button type="submit" className={btn.primario}>
+              Registrar orden
+            </button>
+          </div>
+        ) : (
+          <div className="animar-entrada rounded-2xl border border-marca-200 bg-marca-50/60 p-5">
+            <p className="text-sm text-marca-900">
+              ¿Confirmas el registro de la orden para <strong>{cliente?.nombre_completo}</strong> en{" "}
+              <strong>{direccion}</strong>?
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="button" onClick={guardar} disabled={enviando} className={btn.primario}>
+                <Icono nombre="check" className="h-4 w-4" />
+                {enviando ? "Registrando..." : "Sí, registrar"}
+              </button>
+              <button type="button" onClick={() => setConfirmando(false)} disabled={enviando} className={btn.secundario}>
+                Revisar datos
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Datos heredados de la avería: solo lectura */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-        <h2 className="text-sm font-semibold text-slate-700">Datos de la avería (no editables)</h2>
-        <dl className="mt-3 grid gap-4 sm:grid-cols-2">
-          <Dato etiqueta="Avería" valor={averia.codigo} />
-          <Dato etiqueta="Tipo" valor={averia.tipo} />
-          <Dato etiqueta="Cliente" valor={`${cliente?.nombre_completo} (${cliente?.codigo})`} />
-          <Dato etiqueta="DNI/RUC" valor={cliente?.documento} />
-          <div className="sm:col-span-2">
+      <aside className="space-y-6">
+        <Tarjeta titulo="Avería" descripcion="Datos heredados, no editables." icono="averias">
+          <dl className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Dato etiqueta="Código" valor={averia.codigo} />
+              <Insignia tono="ambar" punto>
+                {averia.estado}
+              </Insignia>
+            </div>
+            <Dato etiqueta="Tipo" valor={averia.tipo} />
             <Dato etiqueta="Descripción" valor={averia.descripcion} />
+          </dl>
+        </Tarjeta>
+
+        <Tarjeta titulo="Cliente" icono="usuario">
+          <div className="flex items-center gap-3">
+            <Avatar nombre={cliente?.nombre_completo} />
+            <div>
+              <p className="font-medium text-slate-900">{cliente?.nombre_completo}</p>
+              <p className="tabular-nums text-xs text-slate-500">{cliente?.codigo}</p>
+            </div>
           </div>
-        </dl>
-      </div>
+          <dl className="mt-4">
+            <Dato etiqueta="DNI/RUC" valor={cliente?.documento} />
+          </dl>
+        </Tarjeta>
 
-      {/* Datos editables de la orden */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label htmlFor="direccion" className="block text-sm font-medium text-slate-700">
-            Dirección de atención <span className="text-red-600">*</span>
-          </label>
-          <input
-            id="direccion"
-            value={direccion}
-            onChange={(e) => setDireccion(e.target.value)}
-            className={claseCampo("direccion")}
-          />
-          {errores.direccion && <p className="mt-1 text-sm text-red-700">{errores.direccion}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="telefono" className="block text-sm font-medium text-slate-700">
-            Teléfono de contacto <span className="text-red-600">*</span>
-          </label>
-          <input
-            id="telefono"
-            inputMode="numeric"
-            maxLength={9}
-            value={telefono}
-            onChange={(e) => setTelefono(e.target.value.replace(/[^0-9]/g, ""))}
-            className={claseCampo("telefono")}
-          />
-          {errores.telefono && <p className="mt-1 text-sm text-red-700">{errores.telefono}</p>}
-        </div>
-
-        <div>
-          <label htmlFor="horario" className="block text-sm font-medium text-slate-700">
-            Horario preferido <span className="text-slate-400">(opcional)</span>
-          </label>
-          <input
-            id="horario"
-            value={horario}
-            onChange={(e) => setHorario(e.target.value)}
-            placeholder="Ej.: Mañanas de 9 a 12"
-            className={claseCampo("horario")}
-          />
-        </div>
-      </div>
-
-      <p className="text-xs text-slate-500">
-        El código, la fecha, la hora y el agente se registran automáticamente. La orden se crea en estado
-        &quot;Pendiente&quot;.
-      </p>
-
-      {error && <p className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
-
-      {!confirmando ? (
-        <button
-          type="submit"
-          className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700"
-        >
-          Registrar orden
-        </button>
-      ) : (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm text-blue-900">
-            ¿Confirmas el registro de la orden para <strong>{cliente?.nombre_completo}</strong> en{" "}
-            <strong>{direccion}</strong>?
-          </p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={guardar}
-              disabled={enviando}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-            >
-              {enviando ? "Registrando..." : "Sí, registrar"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmando(false)}
-              disabled={enviando}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
-              Revisar datos
-            </button>
-          </div>
-        </div>
-      )}
+        <p className="px-1 text-xs text-slate-500">
+          El código, la fecha, la hora y el agente se registran automáticamente. La orden se crea en estado
+          &quot;Pendiente&quot;.
+        </p>
+      </aside>
     </form>
   );
 }

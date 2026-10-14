@@ -1,6 +1,46 @@
 @import "tailwindcss";
 
+/* Tokens de diseño del sistema (colores de marca y tipografía) */
+@theme {
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  --color-marca-50: #eef4ff;
+  --color-marca-100: #dbe6fe;
+  --color-marca-200: #bfd3fe;
+  --color-marca-500: #3b6ef6;
+  --color-marca-600: #2554eb;
+  --color-marca-700: #1d41d8;
+  --color-marca-800: #1e37af;
+  --color-marca-900: #0f1b4d;
+
+  --color-fondo: #f5f7fb;
+  --color-tinta: #0b1220;
+}
+
 body {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+}
+
+/* Barra de desplazamiento discreta en tablas */
+.scroll-fino::-webkit-scrollbar {
+  height: 8px;
+}
+.scroll-fino::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animar-entrada {
+  animation: aparecer 0.25s ease-out;
 }
