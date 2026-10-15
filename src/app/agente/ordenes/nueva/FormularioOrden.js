@@ -8,7 +8,7 @@ import { registrarOrden } from "../actions";
 import Icono from "@/components/Icono";
 import { Tarjeta, Aviso, Avatar, Dato, Insignia, Etiqueta, ErrorCampo, btn, campo } from "@/components/ui";
 
-const TELEFONO_VALIDO = /^[0-9]{9}$/;
+const TELEFONO_VALIDO = /^9[0-9]{8}$/;
 
 export default function FormularioOrden({ datos }) {
   const router = useRouter();
@@ -25,7 +25,7 @@ export default function FormularioOrden({ datos }) {
   function validar() {
     const e = {};
     if (!direccion.trim()) e.direccion = "La dirección de atención es obligatoria.";
-    if (!TELEFONO_VALIDO.test(telefono.replace(/\s+/g, ""))) e.telefono = "El teléfono debe tener 9 dígitos.";
+    if (!TELEFONO_VALIDO.test(telefono.replace(/\s+/g, ""))) e.telefono = "El teléfono debe tener 9 dígitos y empezar con 9.";
     setErrores(e);
     return Object.keys(e).length === 0;
   }
@@ -86,7 +86,7 @@ export default function FormularioOrden({ datos }) {
 
             <div>
               <Etiqueta htmlFor="horario" opcional>
-                Horario preferido
+                Hora preferida de visita
               </Etiqueta>
               <input
                 id="horario"
@@ -95,6 +95,7 @@ export default function FormularioOrden({ datos }) {
                 placeholder="Ej.: Mañanas de 9 a 12"
                 className={campo(false)}
               />
+              <p className="mt-1.5 text-xs text-slate-500">Cuándo prefiere el cliente que lo visite el técnico.</p>
             </div>
           </div>
         </Tarjeta>

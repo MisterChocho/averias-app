@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRol } from "@/lib/auth";
 
 const ESTADOS_ACTIVOS = ["Pendiente", "Asignada", "En atención"];
-const TELEFONO_VALIDO = /^[0-9]{9}$/;
+const TELEFONO_VALIDO = /^9[0-9]{8}$/;
 
 // Convierte los errores de Supabase/PostgreSQL en un mensaje entendible
 function mensajeDeError(error, porDefecto) {
@@ -99,7 +99,7 @@ export async function registrarOrden({ averiaId, direccion, telefono, horario } 
   const errores = {};
   if (!averiaId) errores.averia = "Selecciona una avería.";
   if (!dir) errores.direccion = "La dirección de atención es obligatoria.";
-  if (!TELEFONO_VALIDO.test(tel)) errores.telefono = "El teléfono debe tener 9 dígitos.";
+  if (!TELEFONO_VALIDO.test(tel)) errores.telefono = "El teléfono debe tener 9 dígitos y empezar con 9.";
   if (Object.keys(errores).length) {
     return { ok: false, error: "Revisa los campos marcados.", errores };
   }
