@@ -45,8 +45,8 @@ begin
   if coalesce(trim(p_direccion), '') = '' then
     raise exception 'La dirección de atención es obligatoria.';
   end if;
-  if coalesce(trim(p_telefono), '') !~ '^[0-9]{9}$' then
-    raise exception 'El teléfono de contacto debe tener 9 dígitos.';
+  if coalesce(trim(p_telefono), '') !~ '^9[0-9]{8}$' then
+    raise exception 'El teléfono de contacto debe tener 9 dígitos y empezar con 9.';
   end if;
 
   insert into public.ordenes (averia_id, direccion_atencion, telefono_contacto, horario_preferido, agente_id)

@@ -103,7 +103,7 @@ begin
 
   -- Orden "Cerrada" (NO se puede modificar ni cancelar; útil para HU19/HU20)
   insert into public.averias (cliente_id, tipo_averia_id, descripcion, agente_id, estado)
-  select c.id, t.id, '[PRUEBA] Cable cambiado por el técnico.', v_agente, 'No resuelta'
+  select c.id, t.id, '[PRUEBA] Cable cambiado por el técnico.', v_agente, 'Resuelta'
   from public.clientes c, public.tipos_averia t
   where c.documento = '20509876543' and t.nombre = 'Cable dañado'
   returning id into v_av;

@@ -54,9 +54,9 @@ from (values
   ('Ana Sofía Quispe Morales',      '74567890',    '949555666', 'ana.quispe@correo.com',    'Calle Grau 145',          'El Porvenir', 5),
   ('Pedro Pablo Salazar Torres',    '75678901',    '949666777', null,                       'Mz. B Lt. 12 Alto Trujillo','El Porvenir', 6),
   ('Rosa Elena Gutiérrez Silva',    '76789012',    '949777888', 'rosa.gutierrez@correo.com','Av. La Marina 560',       'Huanchaco', 7),
-  ('Inversiones Norte S.A.C.',      '20481234567', '044123456', 'contacto@invnorte.com',    'Av. América Sur 2100',    'Víctor Larco', 8),
+  ('Inversiones Norte S.A.C.',      '20481234567', '949123456', 'contacto@invnorte.com',    'Av. América Sur 2100',    'Víctor Larco', 8),
   ('Miguel Ángel Rojas Chávez',     '77890123',    '949888999', null,                       'Calle 5 de Abril 340',    'Florencia de Mora', 9),
-  ('Comercial Santa Rosa E.I.R.L.', '20509876543', '044654321', 'ventas@santarosa.com',     'Jr. Pizarro 999',         'Trujillo Centro', 10)
+  ('Comercial Santa Rosa E.I.R.L.', '20509876543', '949654321', 'ventas@santarosa.com',     'Jr. Pizarro 999',         'Trujillo Centro', 10)
 ) as c(nombre, doc, tel, correo, dir, zona, n)
 join public.zonas z on z.nombre = c.zona
 order by c.n;  -- mantiene el orden para que los códigos salgan CLI-00001, CLI-00002...
