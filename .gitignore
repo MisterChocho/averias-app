@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# archivos que guarda la app de Claude (no van al repo)
+/Claude outputs/

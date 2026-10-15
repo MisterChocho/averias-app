@@ -1,19 +1,19 @@
+// HU01 · Listar clientes — punto de inicio de la atención del agente.
 import { listarClientes } from "./actions";
 import ClientesLista from "./ClientesLista";
+import { Encabezado } from "@/components/ui";
 
 export default async function AgenteClientes() {
   const resultado = await listarClientes();
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Clientes</h1>
-        <p className="text-slate-600">
-          Listar y buscar clientes para iniciar la atención.
-        </p>
-      </div>
-
+    <div className="space-y-6">
+      <Encabezado
+        etiqueta="Atención"
+        titulo="Clientes"
+        descripcion="Selecciona al cliente que está llamando para iniciar su atención."
+      />
       <ClientesLista resultado={resultado} />
-    </section>
+    </div>
   );
 }
