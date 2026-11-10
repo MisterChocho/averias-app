@@ -1,5 +1,5 @@
 // Órdenes de avería — HU06 (registrar) y HU08 (cancelar) · Sneider Araneda
-// HU07 (modificar) agregará su propia carpeta: /agente/ordenes/modificar
+// HU07 (modificar): /agente/ordenes/modificar
 import Link from "next/link";
 import { listarOrdenes, listarAveriasSinOrden } from "./datos";
 import EstadoOrden from "./EstadoOrden";
@@ -25,7 +25,7 @@ const METRICAS = [
 ];
 
 export default async function AgenteOrdenes({ searchParams }) {
-  const { registrada, cancelada } = await searchParams;
+  const { registrada, cancelada, modificada } = await searchParams;
   const [resOrdenes, resAverias] = await Promise.all([listarOrdenes(), listarAveriasSinOrden()]);
   const ordenes = resOrdenes.ok ? resOrdenes.ordenes : [];
 
@@ -40,6 +40,11 @@ export default async function AgenteOrdenes({ searchParams }) {
       {registrada && (
         <Aviso tipo="exito">
           Orden <strong>{registrada}</strong> registrada correctamente.
+        </Aviso>
+      )}
+      {modificada && (
+        <Aviso tipo="exito">
+          Orden <strong>{modificada}</strong> modificada correctamente.
         </Aviso>
       )}
       {cancelada && (
@@ -138,7 +143,14 @@ export default async function AgenteOrdenes({ searchParams }) {
                 </td>
                 <td className="whitespace-nowrap px-6 py-3.5 text-slate-500">{fecha(o.fecha_registro)}</td>
                 <td className="px-6 py-3.5">
-                  <CancelarOrden orden={o} />
+                  <div className="flex items-start justify-end gap-2">
+                    {["Pendiente", "Asignada"].includes(o.estado) && (
+                      <Link href={`/agente/ordenes/modificar?orden=${o.id}`} className={btn.chicoSecundario}>
+                        Modificar
+                      </Link>
+                    )}
+                    <CancelarOrden orden={o} />
+                  </div>
                 </td>
               </tr>
             ))}
