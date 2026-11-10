@@ -130,7 +130,7 @@ function limpiar() {
     id="busqueda"
     value={texto}
     onChange={(e) => cambiar(e.target.value)}
-    placeholder="Ej: Ana Sofía, 74567890 o 949555666"
+    placeholder="Ej: Charles David, 74632890 o 949515266"
     autoComplete="off"
     maxLength={60}
     className={campo(false)}
