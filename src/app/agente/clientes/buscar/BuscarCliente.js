@@ -12,32 +12,36 @@ import { Tarjeta, Tabla, Aviso, Vacio, Avatar, Dato, Insignia, Etiqueta, btn, ca
 
 const MINIMO = 2;
 const TONO_AVERIA = { Reportada: "azul", "En diagnóstico": "violeta", Resuelta: "verde", "No resuelta": "ambar" };
-const VACIO = { documento: "", codigo: "", telefono: "" };
+
 
 function fecha(valor) {
   if (!valor) return "—";
   return new Date(valor).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short", timeZone: "America/Lima" });
 }
 
-// Clientes que cumplen todos los campos que tienen 2 o más caracteres
-function filtrar(clientes, f) {
-  const doc = f.documento.trim();
-  const cod = f.codigo.trim().toUpperCase();
-  const tel = f.telefono.trim();
-  const activos = [doc, cod, tel].filter((v) => v.length >= MINIMO).length;
-  if (activos === 0) return { activos, coincidencias: [] };
-  const coincidencias = clientes.filter(
-    (c) =>
-      (doc.length < MINIMO || (c.documento || "").includes(doc)) &&
-      (cod.length < MINIMO || (c.codigo || "").toUpperCase().includes(cod)) &&
-      (tel.length < MINIMO || (c.telefono || "").includes(tel)),
-  );
-  return { activos, coincidencias };
+// Quita tildes y pasa a minúsculas para comparar nombres
+function normalizar(texto) {
+  return (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// Clientes cuyo nombre (cualquier palabra), DNI/RUC o teléfono EMPIEZAN con el texto (desde 2 caracteres)
+function filtrar(clientes, texto) {
+  const t = normalizar(texto.trim());
+  if (t.length < MINIMO) return { activo: false, coincidencias: [] };
+  const coincidencias = clientes.filter((c) => {
+    const nombre = " " + normalizar(c.nombre_completo);
+    return (
+      nombre.includes(" " + t) ||
+      (c.documento || "").startsWith(t) ||
+      (c.telefono || "").startsWith(t)
+    );
+  });
+  return { activo: true, coincidencias };
 }
 
 export default function BuscarCliente({ resultado }) {
   const router = useRouter();
-  const [form, setForm] = useState(VACIO);
+  const [texto, setTexto] = useState("");
   const [aviso, setAviso] = useState(null);
   const [elegido, setElegido] = useState(null); // cliente de la lista
   const [detalle, setDetalle] = useState(null); // cliente con averías (buscarCliente)
@@ -69,8 +73,8 @@ export default function BuscarCliente({ resultado }) {
   }
 
   const clientes = resultado.clientes || [];
-  const { activos, coincidencias } = filtrar(clientes, form);
-  const escribioAlgo = form.documento || form.codigo || form.telefono;
+  const { activo, coincidencias } = filtrar(clientes, texto);
+  const escribioAlgo = texto.trim().length > 0;
 
   function cargarDetalle(cliente) {
     setElegido(cliente);
@@ -85,37 +89,36 @@ export default function BuscarCliente({ resultado }) {
     });
   }
 
-  function cambiar(nombre, valor) {
-    const nuevo = { ...form, [nombre]: valor };
-    setForm(nuevo);
-    setAviso(null);
-    const { coincidencias: nuevas } = filtrar(clientes, nuevo);
-    if (nuevas.length === 1) {
-      if (elegido?.id !== nuevas[0].id) cargarDetalle(nuevas[0]);
-    } else {
-      setElegido(null);
-      setDetalle(null);
-      setErrorDetalle(null);
-    }
-  }
-
-  function buscar(evento) {
-    evento.preventDefault();
-    if (!escribioAlgo) setAviso("Ingresa al menos un dato: DNI/RUC, código o teléfono.");
-    else if (activos === 0) setAviso(`Escribe al menos ${MINIMO} caracteres para buscar.`);
-    else setAviso(null);
-  }
-
-  function limpiar() {
-    setForm(VACIO);
-    setAviso(null);
+  function cambiar(valor) {
+  setTexto(valor);
+  setAviso(null);
+  const { coincidencias: nuevas } = filtrar(clientes, valor);
+  if (nuevas.length === 1) {
+    if (elegido?.id !== nuevas[0].id) cargarDetalle(nuevas[0]);
+  } else {
     setElegido(null);
     setDetalle(null);
     setErrorDetalle(null);
   }
+}
+
+function buscar(evento) {
+  evento.preventDefault();
+  if (!escribioAlgo) setAviso("Ingresa un dato: nombre, DNI/RUC o teléfono.");
+  else if (!activo) setAviso(`Escribe al menos ${MINIMO} caracteres para buscar.`);
+  else setAviso(null);
+}
+
+function limpiar() {
+  setTexto("");
+  setAviso(null);
+  setElegido(null);
+  setDetalle(null);
+  setErrorDetalle(null);
+}
 
   const averias = detalle?.averias || [];
-  const sinCoincidencias = activos > 0 && coincidencias.length === 0;
+  const sinCoincidencias = activo && coincidencias.length === 0;
   const listaVisible = coincidencias.length > 1;
 
   return (
@@ -124,43 +127,17 @@ export default function BuscarCliente({ resultado }) {
         <form onSubmit={buscar} noValidate>
           <div className="grid gap-5 sm:grid-cols-3">
             <div>
-              <Etiqueta htmlFor="documento">DNI/RUC</Etiqueta>
-              <input
-                id="documento"
-                inputMode="numeric"
-                maxLength={11}
-                value={form.documento}
-                onChange={(e) => cambiar("documento", e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="8 u 11 dígitos"
-                autoComplete="off"
-                className={campo(false)}
-              />
-            </div>
-            <div>
-              <Etiqueta htmlFor="codigo">Código de cliente</Etiqueta>
-              <input
-                id="codigo"
-                maxLength={9}
-                value={form.codigo}
-                onChange={(e) => cambiar("codigo", e.target.value.toUpperCase())}
-                placeholder="CLI-00001"
-                autoComplete="off"
-                className={campo(false)}
-              />
-            </div>
-            <div>
-              <Etiqueta htmlFor="telefono">Teléfono</Etiqueta>
-              <input
-                id="telefono"
-                inputMode="numeric"
-                maxLength={9}
-                value={form.telefono}
-                onChange={(e) => cambiar("telefono", e.target.value.replace(/[^0-9]/g, ""))}
-                placeholder="9 dígitos"
-                autoComplete="off"
-                className={campo(false)}
-              />
-            </div>
+  <Etiqueta htmlFor="busqueda">Nombre, DNI/RUC o teléfono</Etiqueta>
+  <input
+    id="busqueda"
+    value={texto}
+    onChange={(e) => cambiar(e.target.value)}
+    placeholder="Ej: Charles David, 74632890 o 949515266"
+    autoComplete="off"
+    maxLength={60}
+    className={campo(false)}
+  />
+</div>
           </div>
 
           {aviso && (
@@ -168,7 +145,7 @@ export default function BuscarCliente({ resultado }) {
               <Aviso tipo="alerta">{aviso}</Aviso>
             </div>
           )}
-          {!aviso && escribioAlgo && activos === 0 && (
+          {!aviso && escribioAlgo && !activo && (
             <p className="mt-4 text-sm text-slate-500">Escribe al menos {MINIMO} caracteres para ver coincidencias.</p>
           )}
 
