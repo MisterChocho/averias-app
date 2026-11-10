@@ -88,24 +88,25 @@ export async function buscarCliente(termino) {
     .select(`
       id,
       codigo,
-      fecha_reporte,
+      fecha_registro,
       estado,
       tipos_averia (
         nombre
       )
     `)
     .eq("cliente_id", cliente.id)
-    .order("fecha_reporte", { ascending: false })
+    .order("fecha_registro", { ascending: false })
     .limit(5);
 
-  if (errorAverias) {
+    if (errorAverias) {
     console.error("[buscarCliente - averias]", errorAverias.code, errorAverias.message);
+    return { ok: false, error: "No se pudo cargar el historial de averías." };
   }
 
   const historialAverias = (averias || []).map((av) => ({
     id: av.id,
     codigo: av.codigo,
-    fecha: av.fecha_reporte,
+    fecha: av.fecha_registro,
     tipo: av.tipos_averia?.nombre || "No especificado",
     estado: av.estado
   }));
