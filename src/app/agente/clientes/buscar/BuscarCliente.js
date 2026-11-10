@@ -24,16 +24,18 @@ function normalizar(texto) {
   return (texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-// Clientes cuyo nombre, DNI/RUC o teléfono contienen el texto (desde 2 caracteres)
+// Clientes cuyo nombre (cualquier palabra), DNI/RUC o teléfono EMPIEZAN con el texto (desde 2 caracteres)
 function filtrar(clientes, texto) {
   const t = normalizar(texto.trim());
   if (t.length < MINIMO) return { activo: false, coincidencias: [] };
-  const coincidencias = clientes.filter(
-    (c) =>
-      normalizar(c.nombre_completo).includes(t) ||
-      (c.documento || "").includes(t) ||
-      (c.telefono || "").includes(t),
-  );
+  const coincidencias = clientes.filter((c) => {
+    const nombre = " " + normalizar(c.nombre_completo);
+    return (
+      nombre.includes(" " + t) ||
+      (c.documento || "").startsWith(t) ||
+      (c.telefono || "").startsWith(t)
+    );
+  });
   return { activo: true, coincidencias };
 }
 
