@@ -1,6 +1,13 @@
-// HU10: reemplazar <Pendiente /> por la pantalla de esta historia.
-import Pendiente from "@/components/Pendiente";
+import { requireRol } from "@/lib/auth";
+import AppShell from "@/components/AppShell";
+import ZonasClient from "./ZonasClient";
 
-export default function GerenteZonas() {
-  return <Pendiente href="/gerente/zonas" />;
+export default async function ZonasPage() {
+  const usuario = await requireRol("gerente");
+
+  return (
+    <AppShell usuario={usuario}>
+      <ZonasClient />
+    </AppShell>
+  );
 }
