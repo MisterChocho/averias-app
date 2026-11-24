@@ -1,39 +1,5 @@
 "use server";
 
-// Backend de técnicos
-//   JOJO-104. HU09 - Administrar estado operativo del técnico
-//
-// Cómo usarlo desde el frontend:
-//
-//   import { listarTecnicos, registrarTecnico, cambiarEstadoTecnico } from "./actions";
-//
-//   1) Al cargar la pantalla: const l = await listarTecnicos();
-//        !l.ok -> mostrar l.error (y el botón Reintentar si l.reintentar)
-//        l.ok  -> l.tecnicos = [{ id, nombre_completo, dni, telefono, correo, estado,
-//                                 cuentaVinculada, ordenesActivas }]
-//                 l.resumen  = { total, activos, inactivos }
-//   2) Al guardar el alta: const r = await registrarTecnico({ nombre, dni, telefono, correo });
-//        !r.ok y r.errores -> resaltar campos: r.errores.nombre / .dni / .telefono / .correo
-//        !r.ok y r.error   -> mostrar el mensaje
-//        r.ok -> r.tecnico = { id, nombre_completo, dni, telefono, correo, estado, cuenta_vinculada }
-//                el técnico siempre queda «Activo»
-//                cuenta_vinculada = false -> aún no tiene cuenta de acceso con ese correo (ver nota)
-//   3) Al activar o desactivar: const r = await cambiarEstadoTecnico(tecnicoId, "Inactivo" | "Activo");
-//        !r.ok -> mostrar r.error
-//        r.ok  -> r.tecnico = { id, nombre_completo, estado }, r.cambio (false si ya tenía ese estado)
-//                 r.ordenesActivas = órdenes «Asignada» o «En atención» que conserva: si es mayor que 0
-//                 al desactivar, avisar al gerente que debe revisarlas.
-//                 Pedir confirmación en pantalla ANTES de desactivar.
-//
-//   Un técnico no se elimina: se desactiva. Con «Inactivo» pierde de inmediato la autoasignación
-//   de órdenes y nadie puede asignarle órdenes nuevas (lo garantiza la base de datos).
-//
-// Nota sobre la cuenta de acceso: el técnico entra con una cuenta de Supabase Authentication cuyo
-// correo es el mismo que se registró aquí. Esa cuenta se crea en Authentication > Users y se le da
-// el rol «tecnico» (como se hace con los usuarios de prueba de 03_datos_prueba.sql). En cuanto la
-// cuenta y el técnico coinciden por correo, la base de datos los vincula sola, en cualquier orden.
-// Este backend no crea cuentas porque eso exigiría la clave de servicio de Supabase en el servidor.
-
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
