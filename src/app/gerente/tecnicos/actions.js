@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 const MENSAJE_ERROR = "No se pudo completar la operación. Intenta nuevamente.";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const MAX_LIMITE = 20; // igual que en supabase/12_funciones_capacidad.sql
 
 // Las reglas de negocio de la base de datos llegan con el código P0001 y ya traen el mensaje
 function mensajeDe(error) {
@@ -28,7 +29,7 @@ export async function listarTecnicos() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tecnicos")
-    .select("id, nombre_completo, dni, telefono, correo, estado, perfil_id, ordenes ( estado )")
+    .select("id, nombre_completo, dni, telefono, correo, estado, max_ordenes, perfil_id, ordenes ( estado )")
     .order("nombre_completo", { ascending: true });
 
   if (error) {
@@ -40,11 +41,17 @@ export async function listarTecnicos() {
     };
   }
 
-  const tecnicos = (data || []).map(({ perfil_id, ordenes, ...t }) => ({
-    ...t,
-    cuentaVinculada: Boolean(perfil_id),
-    ordenesActivas: (ordenes || []).filter((o) => o.estado === "Asignada" || o.estado === "En atención").length,
-  }));
+  const tecnicos = (data || []).map(({ perfil_id, ordenes, max_ordenes, ...t }) => {
+    const ordenesActivas = (ordenes || []).filter((o) => o.estado === "Asignada" || o.estado === "En atención").length;
+    return {
+      ...t,
+      cuentaVinculada: Boolean(perfil_id),
+      ordenesActivas,
+      maxOrdenes: max_ordenes,
+      cupo: Math.max(max_ordenes - ordenesActivas, 0),
+      alLimite: ordenesActivas >= max_ordenes,
+    };
+  });
 
   const activos = tecnicos.filter((t) => t.estado === "Activo").length;
 
@@ -132,5 +139,44 @@ export async function cambiarEstadoTecnico(tecnicoId, estado) {
     tecnico: { id: data.id, nombre_completo: data.nombre_completo, estado: data.estado },
     cambio: data.cambio,
     ordenesActivas: data.ordenes_activas,
+  };
+}
+
+// HU11 · Define cuántas órdenes «Asignada» o «En atención» puede tener a la vez un técnico (1 a 20)
+export async function actualizarLimiteTecnico(tecnicoId, maxOrdenes) {
+  await requireRol("gerente");
+
+  if (typeof tecnicoId !== "string" || !UUID.test(tecnicoId)) {
+    return { ok: false, error: "El técnico no existe." };
+  }
+
+  const limite = typeof maxOrdenes === "string" ? Number(maxOrdenes.trim() || NaN) : maxOrdenes;
+  if (!Number.isInteger(limite) || limite < 1 || limite > MAX_LIMITE) {
+    const mensaje = `El límite debe ser un número entero entre 1 y ${MAX_LIMITE}.`;
+    return { ok: false, error: mensaje, errores: { maxOrdenes: mensaje } };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("actualizar_limite_tecnico", {
+    p_tecnico_id: tecnicoId,
+    p_max: limite,
+  });
+
+  if (error) {
+    console.error("[tecnicos] limite", error.code, error.message);
+    const mensaje = mensajeDe(error);
+    return error.code === "P0001" && /l[ií]mite debe ser/.test(mensaje)
+      ? { ok: false, error: mensaje, errores: { maxOrdenes: mensaje } }
+      : { ok: false, error: mensaje };
+  }
+
+  return {
+    ok: true,
+    tecnico: { id: data.id, nombre_completo: data.nombre_completo, maxOrdenes: data.max_ordenes },
+    anterior: data.anterior,
+    cambio: data.cambio,
+    ordenesActivas: data.ordenes_activas,
+    cupo: data.cupo,
+    superaLimite: data.supera_limite,
   };
 }
