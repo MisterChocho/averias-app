@@ -12,7 +12,7 @@ import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 const MINIMO = 1;
-const MAXIMO = 20;
+const MAXIMO = 10;
 
 export async function listarCapacidad() {
   await requireRol("gerente");

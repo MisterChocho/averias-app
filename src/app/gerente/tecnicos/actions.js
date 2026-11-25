@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 const MENSAJE_ERROR = "No se pudo completar la operación. Intenta nuevamente.";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const MAX_LIMITE = 20; // igual que en supabase/12_funciones_capacidad.sql
+const MAX_LIMITE = 10; // igual que en supabase/12_funciones_capacidad.sql
 
 // Las reglas de negocio de la base de datos llegan con el código P0001 y ya traen el mensaje
 function mensajeDe(error) {
@@ -145,7 +145,7 @@ export async function cambiarEstadoTecnico(tecnicoId, estado) {
   };
 }
 
-// HU11 · Define cuántas órdenes «Asignada» o «En atención» puede tener a la vez un técnico (1 a 20)
+// HU11 · Define cuántas órdenes «Asignada» o «En atención» puede tener a la vez un técnico (1 a 10)
 export async function actualizarLimiteTecnico(tecnicoId, maxOrdenes) {
   await requireRol("gerente");
 

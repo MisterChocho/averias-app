@@ -7,12 +7,12 @@
 
 
 -- ---------------------------------------------------------------------
--- 1. Rango del límite: de 1 a 20 órdenes simultáneas
---    (si en el equipo se acuerda otro tope, cambiar el 20 aquí y en actualizar_limite_tecnico)
+-- 1. Rango del límite: de 1 a 10 órdenes simultáneas
+--    (si en el equipo se acuerda otro tope, cambiar el 10 aquí y en actualizar_limite_tecnico)
 -- ---------------------------------------------------------------------
 alter table public.tecnicos drop constraint if exists tecnicos_max_ordenes_rango_chk;
 alter table public.tecnicos
-  add constraint tecnicos_max_ordenes_rango_chk check (max_ordenes between 1 and 20);
+  add constraint tecnicos_max_ordenes_rango_chk check (max_ordenes between 1 and 10);
 
 
 -- ---------------------------------------------------------------------
@@ -68,7 +68,7 @@ create trigger ordenes_capacidad_tecnico
 
 -- ---------------------------------------------------------------------
 -- 3. Cambiar el límite de órdenes simultáneas de un técnico (solo el gerente)
---    * El límite es un número entero de 1 a 20.
+--    * El límite es un número entero de 1 a 10.
 --    * Si se baja por debajo de las órdenes que el técnico ya tiene, NO se le quita ninguna:
 --      conserva las que tiene y no puede tomar nuevas hasta quedar por debajo del límite
 --      (supera_limite = true).
@@ -92,8 +92,8 @@ begin
     raise exception 'Solo el gerente puede cambiar el límite de órdenes de un técnico.';
   end if;
 
-  if p_max is null or p_max < 1 or p_max > 20 then
-    raise exception 'El límite debe ser un número entero entre 1 y 20.';
+  if p_max is null or p_max < 1 or p_max > 10 then
+    raise exception 'El límite debe ser un número entero entre 1 y 10.';
   end if;
 
   select * into v_tecnico from public.tecnicos where id = p_tecnico_id for update;
