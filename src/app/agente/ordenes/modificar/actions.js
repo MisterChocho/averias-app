@@ -52,17 +52,22 @@ export async function cargarOrdenParaModificar(ordenId) {
   };
 }
 
+const norm = (s) => String(s || "").replace(/\s+/g, "");
+
 export async function modificarOrden({ ordenId, direccion, telefono } = {}) {
   await requireRol("agente");
 
   const dir = String(direccion || "").trim();
-  const tel = String(telefono || "").replace(/\s+/g, "");
+  const tel = norm(telefono);
 
-  const errores = {};
-  if (!ordenId) errores.general = "No se indicó la orden.";
-  if (!dir) errores.direccion = "La dirección de atención es obligatoria.";
-  if (!TELEFONO_VALIDO.test(tel)) errores.telefono = "El teléfono debe tener 9 dígitos y empezar con 9.";
-  if (Object.keys(errores).length) return { ok: false, error: "Revisa los campos marcados.", errores };
+  if (!ordenId) return { ok: false, error: "No se indicó la orden." };
+  if (!dir) {
+    return {
+      ok: false,
+      error: "Revisa los campos marcados.",
+      errores: { direccion: "La dirección de atención es obligatoria." },
+    };
+  }
 
   const supabase = await createClient();
   const { data: actual, error: errLeer } = await supabase
@@ -76,11 +81,22 @@ export async function modificarOrden({ ordenId, direccion, telefono } = {}) {
     return { ok: false, error: "Esta orden ya no puede modificarse" };
   }
 
+  // Comparar normalizando ambos lados
   const cambios = {};
-  if (dir !== actual.direccion_atencion) cambios.direccion_atencion = dir;
-  if (tel !== actual.telefono_contacto) cambios.telefono_contacto = tel;
+  if (dir !== String(actual.direccion_atencion || "").trim()) cambios.direccion_atencion = dir;
+  if (tel !== norm(actual.telefono_contacto)) cambios.telefono_contacto = tel;
+
   if (Object.keys(cambios).length === 0) {
     return { ok: false, error: "No hay cambios para guardar. Modifica al menos un dato." };
+  }
+
+  // El teléfono solo se valida si realmente cambió
+  if (cambios.telefono_contacto && !TELEFONO_VALIDO.test(tel)) {
+    return {
+      ok: false,
+      error: "Revisa los campos marcados.",
+      errores: { telefono: "El teléfono debe tener 9 dígitos y empezar con 9." },
+    };
   }
 
   // Solo actualiza si sigue «Pendiente»/«Asignada» (por si cambió mientras se editaba)

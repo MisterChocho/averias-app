@@ -3,7 +3,7 @@
 // HU24 · Botón «Tomar orden» con confirmación (JOJO-96 frontend) — Sneider Araneda
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { autoasignarse } from "./actions";
+import { autoasignarOrden } from "./actions";
 import Icono from "@/components/Icono";
 import { btn } from "@/components/ui";
 
@@ -16,7 +16,7 @@ export default function TomarOrden({ ordenId, codigo, deshabilitado }) {
   function tomar() {
     setError(null);
     startTransition(async () => {
-      const r = await autoasignarse(ordenId);
+      const r = await autoasignarOrden(ordenId);
       if (!r.ok) {
         setConfirmando(false);
         setError(r.error);

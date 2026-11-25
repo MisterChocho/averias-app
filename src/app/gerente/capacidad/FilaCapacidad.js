@@ -10,7 +10,7 @@ export default function FilaCapacidad({ tecnico, minimo, maximo }) {
   const router = useRouter();
   const [valor, setValor] = useState(String(tecnico.limite));
   const [error, setError] = useState(null);
-  const [exito, setExito] = useState(false);
+  const [exito, setExito] = useState(null);
   const [enviando, startTransition] = useTransition();
 
   const n = Number(valor);
@@ -20,12 +20,16 @@ export default function FilaCapacidad({ tecnico, minimo, maximo }) {
 
   function guardar() {
     setError(null);
-    setExito(false);
+    setExito(null);
     if (!valido) return setError(`Ingresa un número entre ${minimo} y ${maximo}.`);
     startTransition(async () => {
       const r = await guardarCapacidad({ tecnicoId: tecnico.id, limite: n });
       if (!r.ok) return setError(r.error);
-      setExito(true);
+      setExito(
+        r.superaLimite
+          ? "Límite guardado. Conserva las órdenes que tiene, pero no podrá tomar nuevas hasta quedar por debajo."
+          : "Límite guardado."
+      );
       router.refresh();
     });
   }
@@ -62,12 +66,12 @@ export default function FilaCapacidad({ tecnico, minimo, maximo }) {
               onChange={(e) => {
                 setValor(e.target.value);
                 setError(null);
-                setExito(false);
+                setExito(null);
               }}
               className={`${campo(Boolean(error))} !mt-0 w-24`}
             />
             {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-            {exito && !error && <p className="mt-1 text-xs text-emerald-700">Límite guardado.</p>}
+            {exito && !error && <p className="mt-1 max-w-xs text-xs text-emerald-700">{exito}</p>}
           </div>
           <button type="button" onClick={guardar} disabled={enviando || !hayCambios} className={btn.chico}>
             {enviando ? "Guardando..." : "Guardar"}

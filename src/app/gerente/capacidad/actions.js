@@ -60,20 +60,22 @@ export async function guardarCapacidad({ tecnicoId, limite } = {}) {
     return { ok: false, error: `El límite debe ser un número entero entre ${MINIMO} y ${MAXIMO}.` };
   }
 
+  // Backend de Luis y Jhosep: supabase/12_funciones_capacidad.sql
   const supabase = await createClient();
-  const { data: filas, error } = await supabase
-    .from("tecnicos")
-    .update({ max_ordenes: n })
-    .eq("id", tecnicoId)
-    .select("nombre_completo");
+  const { data, error } = await supabase.rpc("actualizar_limite_tecnico", {
+    p_tecnico_id: tecnicoId,
+    p_max: n,
+  });
   if (error) {
     console.error("[capacidad] guardar", error.code, error.message);
-    return { ok: false, error: "No se pudo guardar el límite. Intenta nuevamente." };
+    return {
+      ok: false,
+      error: error.code === "P0001" ? error.message : "No se pudo guardar el límite. Intenta nuevamente.",
+    };
   }
-  if (!filas || filas.length === 0) return { ok: false, error: "El técnico no existe." };
 
   revalidatePath("/gerente/capacidad");
   revalidatePath("/gerente/tecnicos");
   revalidatePath("/tecnico/disponibles");
-  return { ok: true, nombre: filas[0].nombre_completo, limite: n };
+  return { ok: true, nombre: data.nombre_completo, limite: data.max_ordenes, superaLimite: data.supera_limite };
 }

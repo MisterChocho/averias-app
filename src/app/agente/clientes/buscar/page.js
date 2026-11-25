@@ -13,7 +13,7 @@ export default async function Buscar() {
       <Encabezado
         etiqueta="Atención"
         titulo="Buscar información del cliente"
-        descripcion="Busca por DNI/RUC, código de cliente o teléfono. Con un dato basta y con 2 caracteres ya aparecen coincidencias."
+        descripcion="Busca por nombre, DNI/RUC o teléfono. Con un dato basta y con 2 caracteres ya aparecen coincidencias."
         volver={{ href: "/agente/clientes", texto: "Volver a clientes" }}
       />
       <BuscarCliente resultado={resultado} />

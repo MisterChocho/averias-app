@@ -1,6 +1,7 @@
 // HU24 · Órdenes disponibles / autoasignar (JOJO-96 frontend) — Sneider Araneda
 // Muestra las órdenes «Pendiente» de la zona del técnico y le deja tomarlas hasta su límite.
-import { listarDisponibles } from "./actions";
+// Usa el backend de Luis y Jhosep (supabase/10_funciones_autoasignacion.sql).
+import { listarOrdenesDisponibles } from "./actions";
 import TomarOrden from "./TomarOrden";
 import { Encabezado, Tarjeta, Aviso, Vacio, Dato, Insignia } from "@/components/ui";
 
@@ -10,7 +11,8 @@ function fecha(valor) {
 }
 
 export default async function TecnicoDisponibles() {
-  const res = await listarDisponibles();
+  const res = await listarOrdenesDisponibles();
+  const lleno = res.ok && !res.tecnico.puedeAutoasignarse;
 
   return (
     <div className="space-y-6">
@@ -20,8 +22,8 @@ export default async function TecnicoDisponibles() {
         descripcion="Órdenes pendientes de tus zonas de cobertura. Tómalas para atenderlas."
         acciones={
           res.ok && (
-            <Insignia tono={res.lleno ? "rojo" : "azul"}>
-              {res.activas} de {res.maximo} órdenes activas
+            <Insignia tono={lleno ? "rojo" : "azul"}>
+              {res.tecnico.ordenesActivas} de {res.tecnico.maxOrdenes} órdenes activas
             </Insignia>
           )
         }
@@ -31,26 +33,18 @@ export default async function TecnicoDisponibles() {
         <Aviso tipo="error">{res.error}</Aviso>
       ) : (
         <>
-          {res.lleno && (
+          {lleno && (
             <Aviso tipo="alerta" titulo="Llegaste a tu límite de órdenes">
-              Tienes {res.activas} órdenes activas (máximo {res.maximo}). Cierra una para poder tomar otra.
+              Tienes {res.tecnico.ordenesActivas} órdenes activas (máximo {res.tecnico.maxOrdenes}). Cierra una para poder
+              tomar otra.
             </Aviso>
-          )}
-
-          {res.zonas.length === 0 ? (
-            <Aviso tipo="alerta" titulo="Sin zonas asignadas">
-              Todavía no tienes zonas de cobertura. Pide al gerente que te asigne una.
-            </Aviso>
-          ) : (
-            <p className="text-sm text-slate-500">
-              Tus zonas: <span className="font-medium text-slate-700">{res.zonas.join(", ")}</span>
-            </p>
           )}
 
           {res.ordenes.length === 0 ? (
             <Tarjeta sinRelleno>
               <Vacio icono="ordenes" titulo="No hay órdenes disponibles">
-                Cuando se registre una orden pendiente en tus zonas, aparecerá aquí.
+                Cuando se registre una orden pendiente en tus zonas, aparecerá aquí. Si no ves ninguna, confirma con el
+                gerente que tengas zonas asignadas.
               </Vacio>
             </Tarjeta>
           ) : (
@@ -59,24 +53,24 @@ export default async function TecnicoDisponibles() {
                 <Tarjeta
                   key={o.id}
                   titulo={o.codigo}
-                  descripcion={`Avería ${o.averia?.codigo} · ${o.averia?.tipo?.nombre}`}
+                  descripcion={`Avería ${o.averia} · ${o.tipo}`}
                   icono="ordenes"
                   acciones={<Insignia tono="ambar" punto>Pendiente</Insignia>}
                 >
                   <dl className="grid gap-4 sm:grid-cols-2">
-                    <Dato etiqueta="Cliente" valor={o.averia?.cliente?.nombre_completo} icono="usuario" />
-                    <Dato etiqueta="Zona" valor={o.averia?.cliente?.zona?.nombre} icono="zonas" />
+                    <Dato etiqueta="Cliente" valor={o.cliente} icono="usuario" />
+                    <Dato etiqueta="Zona" valor={o.zona} icono="zonas" />
                     <div className="sm:col-span-2">
-                      <Dato etiqueta="Dirección" valor={o.direccion_atencion} icono="ubicacion" />
+                      <Dato etiqueta="Dirección" valor={o.direccion} icono="ubicacion" />
                     </div>
                     <div className="sm:col-span-2">
-                      <Dato etiqueta="Descripción" valor={o.averia?.descripcion} />
+                      <Dato etiqueta="Descripción" valor={o.descripcion} />
                     </div>
-                    <Dato etiqueta="Horario preferido" valor={o.horario_preferido} icono="reloj" />
-                    <Dato etiqueta="Registrada" valor={fecha(o.fecha_registro)} />
+                    <Dato etiqueta="Horario preferido" valor={o.horario} icono="reloj" />
+                    <Dato etiqueta="Registrada" valor={fecha(o.fechaRegistro)} />
                   </dl>
                   <div className="mt-5">
-                    <TomarOrden ordenId={o.id} codigo={o.codigo} deshabilitado={res.lleno} />
+                    <TomarOrden ordenId={o.id} codigo={o.codigo} deshabilitado={lleno} />
                   </div>
                 </Tarjeta>
               ))}

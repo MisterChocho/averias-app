@@ -1,153 +1,185 @@
 "use server";
 
-// HU09 · Administrar estado operativo del técnico (JOJO-98 frontend) — Sneider Araneda
-//
-// Reglas (criterios de aceptación):
-//  - El gerente debe estar autenticado.
-//  - Obligatorios: nombre completo, DNI, teléfono de contacto y correo institucional.
-//  - No se permiten dos técnicos con el mismo DNI.
-//  - Un técnico «Inactivo» queda bloqueado de inmediato para autoasignarse órdenes
-//    (las políticas de la base solo reconocen técnicos «Activo»).
-
-import { revalidatePath } from "next/cache";
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
-const DNI_VALIDO = /^[0-9]{8}$/;
-const TELEFONO_VALIDO = /^9[0-9]{8}$/;
-const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MENSAJE_ERROR = "No se pudo completar la operación. Intenta nuevamente.";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const MAX_LIMITE = 20; // igual que en supabase/12_funciones_capacidad.sql
 
-// ---------------------------------------------------------------------
-// Lista de técnicos con su carga actual
-// ---------------------------------------------------------------------
-export async function listarTecnicos() {
-  await requireRol("gerente");
-  const supabase = await createClient();
-
-  const { data: tecnicos, error } = await supabase
-    .from("tecnicos")
-    .select("id, nombre_completo, dni, telefono, correo, estado, max_ordenes, perfil_id, tecnico_zonas ( zona:zonas ( nombre ) )")
-    .order("nombre_completo", { ascending: true });
-  if (error) {
-    console.error("[tecnicos] listar", error.code, error.message);
-    return { ok: false, error: "No se pudo cargar la lista de técnicos. Intenta nuevamente." };
-  }
-
-  const { data: activas } = await supabase
-    .from("ordenes")
-    .select("tecnico_id")
-    .not("tecnico_id", "is", null)
-    .in("estado", ["Asignada", "En atención"]);
-  const carga = {};
-  (activas || []).forEach((o) => {
-    carga[o.tecnico_id] = (carga[o.tecnico_id] || 0) + 1;
-  });
-
-  return {
-    ok: true,
-    tecnicos: (tecnicos || []).map((t) => ({
-      id: t.id,
-      nombre: t.nombre_completo,
-      dni: t.dni,
-      telefono: t.telefono,
-      correo: t.correo,
-      estado: t.estado,
-      maximo: t.max_ordenes,
-      conCuenta: Boolean(t.perfil_id),
-      zonas: (t.tecnico_zonas || []).map((z) => z.zona?.nombre).filter(Boolean),
-      activas: carga[t.id] || 0,
-    })),
-  };
+// Las reglas de negocio de la base de datos llegan con el código P0001 y ya traen el mensaje
+function mensajeDe(error) {
+  return error.code === "P0001" ? error.message : MENSAJE_ERROR;
 }
 
-// ---------------------------------------------------------------------
-// Alta de técnico
-// ---------------------------------------------------------------------
-export async function registrarTecnico({ nombre, dni, telefono, correo } = {}) {
+// Asocia un mensaje de la base de datos con el campo que corresponde
+function campoDe(mensaje) {
+  if (/DNI/.test(mensaje)) return "dni";
+  if (/correo/i.test(mensaje)) return "correo";
+  if (/tel[eé]fono/i.test(mensaje)) return "telefono";
+  if (/nombre/i.test(mensaje)) return "nombre";
+  return null;
+}
+
+// Lista de técnicos con su estado, si tienen cuenta de acceso y cuántas órdenes en curso tienen
+export async function listarTecnicos() {
   await requireRol("gerente");
 
-  const nom = String(nombre || "").trim().replace(/\s+/g, " ");
-  const doc = String(dni || "").trim();
-  const tel = String(telefono || "").replace(/\s+/g, "");
-  const mail = String(correo || "").trim().toLowerCase();
-
-  const errores = {};
-  if (!nom) errores.nombre = "El nombre completo es obligatorio.";
-  if (!doc) errores.dni = "El DNI es obligatorio.";
-  else if (!DNI_VALIDO.test(doc)) errores.dni = "El DNI debe tener 8 dígitos.";
-  if (!tel) errores.telefono = "El teléfono de contacto es obligatorio.";
-  else if (!TELEFONO_VALIDO.test(tel)) errores.telefono = "El teléfono debe tener 9 dígitos y empezar con 9.";
-  if (!mail) errores.correo = "El correo institucional es obligatorio.";
-  else if (!CORREO_VALIDO.test(mail)) errores.correo = "Ingresa un correo válido.";
-  if (Object.keys(errores).length) return { ok: false, error: "Revisa los campos marcados.", errores };
-
   const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tecnicos")
+    .select(
+      "id, nombre_completo, dni, telefono, correo, estado, max_ordenes, perfil_id, ordenes ( estado ), tecnico_zonas ( zona:zonas ( nombre ) )"
+    )
+    .order("nombre_completo", { ascending: true });
 
-  // DNI repetido
-  const { data: existente } = await supabase.from("tecnicos").select("id, nombre_completo").eq("dni", doc).maybeSingle();
-  if (existente) {
+  if (error) {
+    console.error("[tecnicos] listar", error.code, error.message);
     return {
       ok: false,
-      error: "Revisa los campos marcados.",
-      errores: { dni: `Ya existe un técnico con este DNI (${existente.nombre_completo}).` },
+      error: "No se pudo cargar la lista de técnicos. Intenta nuevamente.",
+      reintentar: true,
     };
   }
 
-  // Si ya existe una cuenta de acceso con ese correo y rol técnico, se vincula
-  let perfilId = null;
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("id, rol")
-    .ilike("correo", mail)
-    .eq("rol", "tecnico")
-    .maybeSingle();
-  if (perfil) {
-    const { data: yaVinculado } = await supabase.from("tecnicos").select("id").eq("perfil_id", perfil.id).maybeSingle();
-    if (!yaVinculado) perfilId = perfil.id;
-  }
-
-  const { error } = await supabase.from("tecnicos").insert({
-    nombre_completo: nom,
-    dni: doc,
-    telefono: tel,
-    correo: mail,
-    estado: "Activo",
-    perfil_id: perfilId,
+  const tecnicos = (data || []).map(({ perfil_id, ordenes, max_ordenes, tecnico_zonas, ...t }) => {
+    const ordenesActivas = (ordenes || []).filter((o) => o.estado === "Asignada" || o.estado === "En atención").length;
+    return {
+      ...t,
+      cuentaVinculada: Boolean(perfil_id),
+      zonas: (tecnico_zonas || []).map((z) => z.zona?.nombre).filter(Boolean),
+      ordenesActivas,
+      maxOrdenes: max_ordenes,
+      cupo: Math.max(max_ordenes - ordenesActivas, 0),
+      alLimite: ordenesActivas >= max_ordenes,
+    };
   });
-  if (error) {
-    if (error.code === "23505") {
-      return { ok: false, error: "Revisa los campos marcados.", errores: { dni: "Ya existe un técnico con este DNI." } };
-    }
-    console.error("[tecnicos] insertar", error.code, error.message);
-    return { ok: false, error: "No se pudo registrar al técnico. Intenta nuevamente." };
-  }
 
-  revalidatePath("/gerente/tecnicos");
-  return { ok: true, nombre: nom, conCuenta: Boolean(perfilId) };
+  const activos = tecnicos.filter((t) => t.estado === "Activo").length;
+
+  return {
+    ok: true,
+    tecnicos,
+    resumen: { total: tecnicos.length, activos, inactivos: tecnicos.length - activos },
+  };
 }
 
-// ---------------------------------------------------------------------
-// Cambiar el estado operativo («Activo» / «Inactivo»)
-// ---------------------------------------------------------------------
-export async function cambiarEstadoTecnico({ tecnicoId, estado } = {}) {
+// Alta de un técnico: nombre completo, DNI, teléfono de contacto y correo institucional
+export async function registrarTecnico({ nombre, dni, telefono, correo } = {}) {
   await requireRol("gerente");
-  if (!tecnicoId) return { ok: false, error: "No se indicó el técnico." };
-  if (!["Activo", "Inactivo"].includes(estado)) return { ok: false, error: "Estado no válido." };
+
+  const datos = {
+    nombre: String(nombre || "").trim(),
+    dni: String(dni || "").trim(),
+    telefono: String(telefono || "").trim(),
+    correo: String(correo || "").trim().toLowerCase(),
+  };
+
+  const errores = {};
+  if (!datos.nombre) errores.nombre = "El nombre completo es obligatorio.";
+
+  if (!datos.dni) errores.dni = "El DNI es obligatorio.";
+  else if (!/^[0-9]{8}$/.test(datos.dni)) errores.dni = "El DNI debe tener 8 dígitos.";
+
+  if (!datos.telefono) errores.telefono = "El teléfono de contacto es obligatorio.";
+  else if (!/^9[0-9]{8}$/.test(datos.telefono)) {
+    errores.telefono = "El teléfono de contacto debe tener 9 dígitos y empezar con 9.";
+  }
+
+  if (!datos.correo) errores.correo = "El correo institucional es obligatorio.";
+  else if (!EMAIL.test(datos.correo)) errores.correo = "El correo institucional no tiene un formato válido.";
+
+  if (Object.keys(errores).length) {
+    return { ok: false, error: "Revisa los campos marcados.", errores };
+  }
 
   const supabase = await createClient();
-  const { data: filas, error } = await supabase
-    .from("tecnicos")
-    .update({ estado })
-    .eq("id", tecnicoId)
-    .select("nombre_completo");
+  const { data, error } = await supabase.rpc("registrar_tecnico", {
+    p_nombre: datos.nombre,
+    p_dni: datos.dni,
+    p_telefono: datos.telefono,
+    p_correo: datos.correo,
+  });
+
+  if (error) {
+    console.error("[tecnicos] registrar", error.code, error.message);
+    const mensaje = mensajeDe(error);
+    const campo = error.code === "P0001" ? campoDe(mensaje) : null;
+    // DNI o correo repetidos: se marca el campo y también se muestra el mensaje
+    return campo
+      ? { ok: false, error: mensaje, errores: { [campo]: mensaje } }
+      : { ok: false, error: mensaje };
+  }
+
+  return { ok: true, tecnico: data };
+}
+
+// Activar o desactivar a un técnico. «Inactivo» bloquea de inmediato la autoasignación de órdenes.
+export async function cambiarEstadoTecnico(tecnicoId, estado) {
+  await requireRol("gerente");
+
+  if (typeof tecnicoId !== "string" || !UUID.test(tecnicoId)) {
+    return { ok: false, error: "El técnico no existe." };
+  }
+  if (!["Activo", "Inactivo"].includes(estado)) {
+    return { ok: false, error: "El estado debe ser «Activo» o «Inactivo»." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("cambiar_estado_tecnico", {
+    p_tecnico_id: tecnicoId,
+    p_estado: estado,
+  });
+
   if (error) {
     console.error("[tecnicos] estado", error.code, error.message);
-    return { ok: false, error: "No se pudo cambiar el estado. Intenta nuevamente." };
+    return { ok: false, error: mensajeDe(error) };
   }
-  if (!filas || filas.length === 0) return { ok: false, error: "El técnico no existe." };
 
-  revalidatePath("/gerente/tecnicos");
-  revalidatePath("/gerente/zonas");
-  revalidatePath("/gerente/capacidad");
-  return { ok: true, nombre: filas[0].nombre_completo, estado };
+  return {
+    ok: true,
+    tecnico: { id: data.id, nombre_completo: data.nombre_completo, estado: data.estado },
+    cambio: data.cambio,
+    ordenesActivas: data.ordenes_activas,
+  };
+}
+
+// HU11 · Define cuántas órdenes «Asignada» o «En atención» puede tener a la vez un técnico (1 a 20)
+export async function actualizarLimiteTecnico(tecnicoId, maxOrdenes) {
+  await requireRol("gerente");
+
+  if (typeof tecnicoId !== "string" || !UUID.test(tecnicoId)) {
+    return { ok: false, error: "El técnico no existe." };
+  }
+
+  const limite = typeof maxOrdenes === "string" ? Number(maxOrdenes.trim() || NaN) : maxOrdenes;
+  if (!Number.isInteger(limite) || limite < 1 || limite > MAX_LIMITE) {
+    const mensaje = `El límite debe ser un número entero entre 1 y ${MAX_LIMITE}.`;
+    return { ok: false, error: mensaje, errores: { maxOrdenes: mensaje } };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("actualizar_limite_tecnico", {
+    p_tecnico_id: tecnicoId,
+    p_max: limite,
+  });
+
+  if (error) {
+    console.error("[tecnicos] limite", error.code, error.message);
+    const mensaje = mensajeDe(error);
+    return error.code === "P0001" && /l[ií]mite debe ser/.test(mensaje)
+      ? { ok: false, error: mensaje, errores: { maxOrdenes: mensaje } }
+      : { ok: false, error: mensaje };
+  }
+
+  return {
+    ok: true,
+    tecnico: { id: data.id, nombre_completo: data.nombre_completo, maxOrdenes: data.max_ordenes },
+    anterior: data.anterior,
+    cambio: data.cambio,
+    ordenesActivas: data.ordenes_activas,
+    cupo: data.cupo,
+    superaLimite: data.supera_limite,
+  };
 }

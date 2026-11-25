@@ -49,9 +49,9 @@ export default function FormularioTecnico() {
       setCorreo("");
       setErrores({});
       setExito(
-        r.conCuenta
-          ? `Técnico ${r.nombre} registrado y vinculado a su cuenta de acceso.`
-          : `Técnico ${r.nombre} registrado. Aún no tiene una cuenta de acceso vinculada a ese correo.`
+        r.tecnico.cuenta_vinculada
+          ? `Técnico ${r.tecnico.nombre_completo} registrado y vinculado a su cuenta de acceso.`
+          : `Técnico ${r.tecnico.nombre_completo} registrado. Aún no tiene una cuenta de acceso vinculada a ese correo.`
       );
       router.refresh();
     });

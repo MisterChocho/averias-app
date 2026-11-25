@@ -1,17 +1,94 @@
 "use server";
 
-// HU05 · Registrar valoración del cliente (JOJO-72 frontend) — Sneider Araneda
-//
-// Usa la tabla `valoraciones` (una por avería, no editable ni eliminable por las políticas RLS).
-// Nota: en el esquema la avería resuelta por teléfono tiene estado «Resuelta»
-// (en Jira se llama «Resuelta en primer contacto»).
+// JOJO-71. HU05 - Registrar valoración del cliente
 
 import { requireRol } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
+const MENSAJE_ERROR = "No se pudo completar la operación. Intenta nuevamente.";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_COMENTARIO = 500;
+const MAX_VALORADAS = 20;
+const MAX_PENDIENTES = 200;
+
+const CLIENTE = "cliente:clientes ( codigo, nombre_completo, documento, telefono )";
+
+// Las reglas de negocio de la base de datos llegan con el código P0001 y ya traen el mensaje
+function mensajeDe(error) {
+  return error.code === "P0001" ? error.message : MENSAJE_ERROR;
+}
+
+function unico(relacion) {
+  return Array.isArray(relacion) ? relacion[0] : relacion;
+}
+
+function tiene(relacion) {
+  return Array.isArray(relacion) ? relacion.length > 0 : Boolean(relacion);
+}
+
+// Listas de la pantalla: pendientes de valorar y ya valoradas
+export async function listarAveriasResueltas() {
+  await requireRol("agente");
+  const supabase = await createClient();
+
+  // Pendientes: «Resuelta», sin orden de técnico y sin valoración
+  const pendientesQ = supabase
+    .from("averias")
+    .select(`
+      id, codigo, descripcion, fecha_resolucion,
+      tipo:tipos_averia ( nombre ),
+      ${CLIENTE},
+      valoraciones ( id ),
+      ordenes ( id )
+    `)
+    .eq("estado", "Resuelta")
+    .order("fecha_resolucion", { ascending: false, nullsFirst: false })
+    .limit(MAX_PENDIENTES);
+
+  // Ya valoradas: las últimas, solo lectura
+  const valoradasQ = supabase
+    .from("valoraciones")
+    .select(`
+      puntaje, no_desea, comentario, fecha,
+      averia:averias (
+        id, codigo, descripcion, fecha_resolucion,
+        tipo:tipos_averia ( nombre ),
+        ${CLIENTE}
+      )
+    `)
+    .order("fecha", { ascending: false })
+    .limit(MAX_VALORADAS);
+
+  const [p, v] = await Promise.all([pendientesQ, valoradasQ]);
+
+  if (p.error || v.error) {
+    const e = p.error || v.error;
+    console.error("[valoracion] listar", e.code, e.message);
+    return {
+      ok: false,
+      error: "No se pudo cargar las averías resueltas. Intenta nuevamente.",
+      reintentar: true,
+    };
+  }
+
+  const pendientes = (p.data || [])
+    .filter((a) => !tiene(a.valoraciones) && !tiene(a.ordenes))
+    .map(({ valoraciones, ordenes, ...averia }) => averia);
+
+  const valoradas = (v.data || [])
+    .filter((x) => x.averia)
+    .map(({ averia, ...valoracion }) => ({ ...averia, valoracion }));
+
+  return { ok: true, pendientes, valoradas };
+}
+
+// Datos de una avería para valorarla. Si ya tiene valoración se devuelve para mostrarla en solo lectura.
 export async function cargarParaValoracion(averiaId) {
   await requireRol("agente");
   if (!averiaId) return { ok: false, error: "No se indicó la avería." };
+  if (typeof averiaId !== "string" || !UUID.test(averiaId)) {
+    return { ok: false, error: "La avería no existe." };
+  }
 
   const supabase = await createClient();
   const { data: averia, error } = await supabase
@@ -31,13 +108,30 @@ export async function cargarParaValoracion(averiaId) {
   }
   if (!averia) return { ok: false, error: "La avería no existe." };
 
-  const existente = Array.isArray(averia.valoraciones) ? averia.valoraciones[0] : averia.valoraciones;
+  const existente = unico(averia.valoraciones) || null;
 
-  if (!existente && averia.estado !== "Resuelta") {
-    return {
-      ok: false,
-      error: `La valoración solo se habilita para averías resueltas en primer contacto. Esta avería está «${averia.estado}».`,
-    };
+  if (!existente) {
+    if (averia.estado !== "Resuelta") {
+      return {
+        ok: false,
+        error: `La valoración solo se habilita para averías resueltas en primer contacto. Esta avería está «${averia.estado}».`,
+      };
+    }
+
+    // Una avería «Resuelta» por un técnico (tiene orden) no es de primer contacto
+    const { data: primerContacto, error: errPC } = await supabase.rpc("es_primer_contacto", {
+      p_averia_id: averiaId,
+    });
+    if (errPC) {
+      console.error("[valoracion] primer contacto", errPC.code, errPC.message);
+      return { ok: false, error: "No se pudo cargar la avería. Intenta nuevamente." };
+    }
+    if (!primerContacto) {
+      return {
+        ok: false,
+        error: "Esta avería no se resolvió en primer contacto: tuvo una orden de técnico.",
+      };
+    }
   }
 
   return {
@@ -49,53 +143,55 @@ export async function cargarParaValoracion(averiaId) {
       tipo: averia.tipo?.nombre,
       cliente: averia.cliente?.nombre_completo,
     },
-    existente: existente || null, // si ya tiene valoración se muestra en solo lectura
+    existente, // si ya tiene valoración se muestra en solo lectura
   };
 }
 
+// Guarda la valoración. El frontend pide la confirmación antes de llamar a esta función.
 export async function registrarValoracion({ averiaId, puntaje, noDesea, comentario } = {}) {
-  const { user } = await requireRol("agente");
+  await requireRol("agente");
 
   const errores = {};
   const coment = String(comentario || "").trim();
   const pje = noDesea ? null : Number(puntaje);
 
   if (!averiaId) errores.general = "No se indicó la avería.";
+  else if (typeof averiaId !== "string" || !UUID.test(averiaId)) errores.general = "La avería no existe.";
+
   if (!noDesea && !(Number.isInteger(pje) && pje >= 1 && pje <= 5)) {
     errores.puntaje = "Elige un puntaje del 1 al 5 o «El cliente no desea valorar».";
   }
   if (!noDesea && pje && pje <= 2 && !coment) {
     errores.comentario = "El comentario es obligatorio cuando el puntaje es 1 o 2.";
   }
+  if (coment.length > MAX_COMENTARIO) {
+    errores.comentario = `El comentario no puede superar los ${MAX_COMENTARIO} caracteres.`;
+  }
   if (Object.keys(errores).length) {
-    return { ok: false, error: "Revisa los campos marcados.", errores };
+    return { ok: false, error: errores.general || "Revisa los campos marcados.", errores };
   }
 
   const supabase = await createClient();
-
-  // Solo averías resueltas por teléfono
-  const { data: averia } = await supabase
-    .from("averias")
-    .select("estado")
-    .eq("id", averiaId)
-    .maybeSingle();
-  if (!averia || averia.estado !== "Resuelta") {
-    return { ok: false, error: "Solo se puede valorar una avería resuelta en primer contacto." };
-  }
-
-  const { error } = await supabase.from("valoraciones").insert({
-    averia_id: averiaId,
-    puntaje: pje,
-    no_desea: Boolean(noDesea),
-    comentario: coment || null,
-    agente_id: user.id, // queda asociada al agente; la fecha la pone la base de datos
+  const { data, error } = await supabase.rpc("registrar_valoracion", {
+    p_averia_id: averiaId,
+    p_puntaje: pje,
+    p_no_desea: Boolean(noDesea),
+    p_comentario: coment || null,
   });
 
   if (error) {
-    // 23505 = ya existe (averia_id es único): no se permite una segunda valoración
-    if (error.code === "23505") return { ok: false, error: "Esta avería ya tiene una valoración registrada." };
-    console.error("[valoracion] insertar", error.code, error.message);
-    return { ok: false, error: "No se pudo guardar la valoración. Intenta nuevamente." };
+    console.error("[valoracion] registrar", error.code, error.message);
+    return { ok: false, error: mensajeDe(error) };
   }
-  return { ok: true };
+
+  return {
+    ok: true,
+    codigo: data.codigo,
+    valoracion: {
+      puntaje: data.puntaje,
+      no_desea: data.no_desea,
+      comentario: data.comentario,
+      fecha: data.fecha,
+    },
+  };
 }

@@ -48,59 +48,30 @@ export async function listarZonasYTecnicos() {
 }
 
 export async function guardarZonas({ tecnicoId, zonaIds } = {}) {
-  const { user } = await requireRol("gerente");
+  await requireRol("gerente");
   if (!tecnicoId) return { ok: false, error: "No se indicó el técnico." };
 
   const nuevas = Array.from(new Set((Array.isArray(zonaIds) ? zonaIds : []).map(Number))).filter((n) => Number.isInteger(n));
   if (nuevas.length === 0) return { ok: false, error: "Asigna al menos una zona al técnico." };
 
+  // Backend de Luis y Jhosep: supabase/13_funciones_zonas.sql
+  // La función quita y agrega zonas, guarda el historial (con el gerente que autoriza) y avisa
+  // cuántas órdenes activas del técnico quedaron fuera de sus zonas.
   const supabase = await createClient();
-
-  const { data: tecnico } = await supabase.from("tecnicos").select("id, nombre_completo").eq("id", tecnicoId).maybeSingle();
-  if (!tecnico) return { ok: false, error: "El técnico no existe." };
-
-  const { data: zonas } = await supabase.from("zonas").select("id, nombre");
-  const nombrePorId = Object.fromEntries((zonas || []).map((z) => [z.id, z.nombre]));
-  if (nuevas.some((id) => !nombrePorId[id])) return { ok: false, error: "Alguna de las zonas elegidas no existe." };
-
-  const { data: actuales } = await supabase.from("tecnico_zonas").select("zona_id").eq("tecnico_id", tecnicoId);
-  const previas = (actuales || []).map((z) => z.zona_id);
-
-  const quitar = previas.filter((id) => !nuevas.includes(id));
-  const agregar = nuevas.filter((id) => !previas.includes(id));
-  if (quitar.length === 0 && agregar.length === 0) {
-    return { ok: false, error: "No hay cambios para guardar. Modifica al menos una zona." };
-  }
-
-  if (quitar.length) {
-    const { error } = await supabase.from("tecnico_zonas").delete().eq("tecnico_id", tecnicoId).in("zona_id", quitar);
-    if (error) {
-      console.error("[zonas] quitar", error.code, error.message);
-      return { ok: false, error: "No se pudieron guardar las zonas. Intenta nuevamente." };
-    }
-  }
-  if (agregar.length) {
-    const { error } = await supabase
-      .from("tecnico_zonas")
-      .insert(agregar.map((zona_id) => ({ tecnico_id: tecnicoId, zona_id })));
-    if (error) {
-      console.error("[zonas] agregar", error.code, error.message);
-      return { ok: false, error: "No se pudieron guardar las zonas. Revisa el resultado e intenta nuevamente." };
-    }
-  }
-
-  // Historial del cambio (zona previa y nueva, con quién lo autorizó)
-  const texto = (ids) => ids.map((id) => nombrePorId[id]).filter(Boolean).sort().join(", ") || null;
-  const { error: errHist } = await supabase.from("historial_zonas").insert({
-    tecnico_id: tecnicoId,
-    zona_anterior: texto(previas),
-    zona_nueva: texto(nuevas),
-    autorizado_por: user.id,
+  const { data, error } = await supabase.rpc("asignar_zonas_tecnico", {
+    p_tecnico_id: tecnicoId,
+    p_zonas: nuevas,
   });
-  if (errHist) console.error("[zonas] historial", errHist.code, errHist.message);
+  if (error) {
+    console.error("[zonas] guardar", error.code, error.message);
+    return {
+      ok: false,
+      error: error.code === "P0001" ? error.message : "No se pudieron guardar las zonas. Intenta nuevamente.",
+    };
+  }
 
   revalidatePath("/gerente/zonas");
   revalidatePath("/gerente/tecnicos");
   revalidatePath("/tecnico/disponibles");
-  return { ok: true, nombre: tecnico.nombre_completo };
+  return { ok: true, nombre: data.nombre_completo, cambio: data.cambio, fuera: data.ordenes_fuera_de_zona };
 }

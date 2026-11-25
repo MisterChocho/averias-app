@@ -30,7 +30,14 @@ function TarjetaTecnico({ tecnico, zonas }) {
     startTransition(async () => {
       const r = await guardarZonas({ tecnicoId: tecnico.id, zonaIds: elegidas });
       if (!r.ok) return setError(r.error);
-      setExito("Zonas actualizadas. El cambio ya rige para sus órdenes disponibles.");
+      setExito(
+        (r.cambio
+          ? "Zonas actualizadas. El cambio ya rige para sus órdenes disponibles."
+          : "No hubo cambios en las zonas asignadas.") +
+          (r.fuera > 0
+            ? ` Atención: tiene ${r.fuera} ${r.fuera === 1 ? "orden activa" : "órdenes activas"} fuera de sus nuevas zonas.`
+            : "")
+      );
       router.refresh();
     });
   }

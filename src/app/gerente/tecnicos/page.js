@@ -1,5 +1,6 @@
 // HU09 · Administrar técnicos (JOJO-98 frontend) — Sneider Araneda
 // El gerente da de alta técnicos y gestiona su estado operativo (Activo / Inactivo).
+// Usa el backend de Luis y Jhosep (supabase/09_funciones_tecnicos.sql).
 import { listarTecnicos } from "./actions";
 import FormularioTecnico from "./FormularioTecnico";
 import BotonEstado from "./BotonEstado";
@@ -14,7 +15,7 @@ export default async function GerenteTecnicos() {
         etiqueta="Gestión"
         titulo="Técnicos"
         descripcion="Da de alta al personal técnico y controla quién puede autoasignarse órdenes."
-        acciones={res.ok && <Insignia tono="azul">{res.tecnicos.length} técnicos</Insignia>}
+        acciones={res.ok && <Insignia tono="azul">{res.resumen.total} técnicos</Insignia>}
       />
 
       <FormularioTecnico />
@@ -33,10 +34,10 @@ export default async function GerenteTecnicos() {
                 <tr key={t.id} className="align-top">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <Avatar nombre={t.nombre} tamano="sm" />
+                      <Avatar nombre={t.nombre_completo} tamano="sm" />
                       <div>
-                        <p className="font-medium text-slate-900">{t.nombre}</p>
-                        {!t.conCuenta && <p className="text-xs text-amber-700">Sin cuenta de acceso</p>}
+                        <p className="font-medium text-slate-900">{t.nombre_completo}</p>
+                        {!t.cuentaVinculada && <p className="text-xs text-amber-700">Sin cuenta de acceso</p>}
                       </div>
                     </div>
                   </td>
@@ -47,7 +48,7 @@ export default async function GerenteTecnicos() {
                   </td>
                   <td className="px-6 py-4 text-slate-700">{t.zonas.length ? t.zonas.join(", ") : "—"}</td>
                   <td className="px-6 py-4 text-slate-700">
-                    {t.activas} de {t.maximo}
+                    {t.ordenesActivas} de {t.maxOrdenes}
                   </td>
                   <td className="px-6 py-4">
                     <Insignia tono={t.estado === "Activo" ? "verde" : "gris"} punto>
@@ -56,7 +57,12 @@ export default async function GerenteTecnicos() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex justify-end">
-                      <BotonEstado tecnicoId={t.id} nombre={t.nombre} estado={t.estado} activas={t.activas} />
+                      <BotonEstado
+                        tecnicoId={t.id}
+                        nombre={t.nombre_completo}
+                        estado={t.estado}
+                        activas={t.ordenesActivas}
+                      />
                     </div>
                   </td>
                 </tr>

@@ -17,7 +17,7 @@ export default function BotonEstado({ tecnicoId, nombre, estado, activas }) {
   function aplicar() {
     setError(null);
     startTransition(async () => {
-      const r = await cambiarEstadoTecnico({ tecnicoId, estado: nuevo });
+      const r = await cambiarEstadoTecnico(tecnicoId, nuevo);
       if (!r.ok) {
         setConfirmando(false);
         return setError(r.error);

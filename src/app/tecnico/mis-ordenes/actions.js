@@ -1,6 +1,6 @@
 "use server";
 
-// HU12 · Consultar mis órdenes (JOJO-94) y HU13 · Registrar atención (JOJO-95) — Sneider Araneda
+// HU12 · Consultar mis órdenes (JOJO-94) y HU13 · Registrar atención (JOJO-95, JOJO-128) — Sneider Araneda
 //
 // Usa las tablas del esquema (ordenes, atenciones, tecnicos). Las políticas RLS ya limitan al técnico
 // a sus propias órdenes. Si Luis/Josep tienen sus acciones de HU12/HU13, se pueden reemplazar por estas.
@@ -116,65 +116,41 @@ export async function cargarOrdenParaAtencion(ordenId) {
 // ---------------------------------------------------------------------
 // HU13 · Registrar atención: guarda diagnóstico y solución y pasa la orden a «En atención»
 // ---------------------------------------------------------------------
+const MENSAJE_ERROR = "No se pudo completar la operación. Intenta nuevamente.";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function registrarAtencion({ ordenId, diagnostico, solucion } = {}) {
-  const { user } = await requireRol("tecnico");
+  await requireRol("tecnico");
 
   const diag = String(diagnostico || "").trim();
   const sol = String(solucion || "").trim();
   const errores = {};
   if (!ordenId) errores.general = "No se indicó la orden.";
+  else if (typeof ordenId !== "string" || !UUID.test(ordenId)) errores.general = "La orden no existe.";
   if (!diag) errores.diagnostico = "El diagnóstico es obligatorio.";
   if (!sol) errores.solucion = "La solución aplicada es obligatoria.";
-  if (Object.keys(errores).length) return { ok: false, error: "Revisa los campos marcados.", errores };
+  if (Object.keys(errores).length) {
+    return { ok: false, error: errores.general || "Revisa los campos marcados.", errores };
+  }
 
   const supabase = await createClient();
-  const tecnico = await tecnicoActual(supabase, user.id);
-  if (!tecnico || tecnico.estado !== "Activo") {
-    return { ok: false, error: "Tu cuenta de técnico no está activa." };
-  }
-
-  // La orden debe ser de este técnico y estar Asignada o En atención
-  const { data: orden } = await supabase
-    .from("ordenes")
-    .select("id, codigo, estado, tecnico_id")
-    .eq("id", ordenId)
-    .maybeSingle();
-  if (!orden || orden.tecnico_id !== tecnico.id) {
-    return { ok: false, error: "Solo puedes registrar la atención de órdenes asignadas a ti." };
-  }
-  if (!ESTADOS_VISIBLES.includes(orden.estado)) {
-    return { ok: false, error: `Esta orden está «${orden.estado}» y ya no admite registrar atención.` };
-  }
-
-  // 1) Registro con autor (tecnico_id) y fecha/hora automática
-  const { error: errAtencion } = await supabase.from("atenciones").insert({
-    orden_id: orden.id,
-    tecnico_id: tecnico.id,
-    diagnostico: diag,
-    solucion: sol,
+  const { data, error } = await supabase.rpc("registrar_atencion", {
+    p_orden_id: ordenId,
+    p_diagnostico: diag,
+    p_solucion: sol,
   });
-  if (errAtencion) {
-    console.error("[atencion] insertar", errAtencion.code, errAtencion.message);
-    return { ok: false, error: "No se pudo guardar la atención. Intenta nuevamente." };
-  }
 
-  // 2) La orden pasa a «En atención» (si ya lo estaba, no cambia)
-  if (orden.estado !== "En atención") {
-    const { error: errEstado } = await supabase
-      .from("ordenes")
-      .update({ estado: "En atención" })
-      .eq("id", orden.id)
-      .eq("tecnico_id", tecnico.id)
-      .eq("estado", "Asignada");
-    if (errEstado) {
-      console.error("[atencion] estado", errEstado.code, errEstado.message);
-      return {
-        ok: false,
-        error: "La atención se guardó, pero no se pudo cambiar la orden a «En atención». Avisa al gerente.",
-      };
-    }
+  if (error) {
+    console.error("[atencion] registrar", error.code, error.message);
+    // Las reglas de negocio de la base de datos llegan con el código P0001 y ya traen el mensaje
+    return { ok: false, error: error.code === "P0001" ? error.message : MENSAJE_ERROR };
   }
 
   revalidatePath("/tecnico/mis-ordenes");
-  return { ok: true, codigo: orden.codigo, mensaje: `Atención de la orden ${orden.codigo} registrada correctamente.` };
+  return {
+    ok: true,
+    codigo: data.codigo,
+    estado: data.estado,
+    mensaje: `Atención de la orden ${data.codigo} registrada correctamente.`,
+  };
 }
