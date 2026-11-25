@@ -268,7 +268,7 @@ function limpiar() {
             {averias.length === 0 ? (
               <Vacio icono="averias" titulo="Este cliente no tiene averías registradas" />
             ) : (
-              <Tabla columnas={["Código", "Fecha", "Tipo", "Estado"]}>
+              <Tabla columnas={["Código", "Fecha", "Tipo", "Estado", { texto: "", derecha: true }]}>
                 {averias.map((a) => (
                   <tr key={a.id} className="transition hover:bg-slate-50">
                     <td className="whitespace-nowrap px-6 py-3.5 tabular-nums text-sm font-medium text-slate-900">{a.codigo}</td>
@@ -279,6 +279,16 @@ function limpiar() {
                         {a.estado}
                       </Insignia>
                     </td>
+                    
+
+{/* NUEVO */}
+<td className="px-6 py-3.5 text-right">
+  {a.estado === "En diagnóstico" && (
+    <Link href={`/agente/averias/guia?averia=${a.id}`} className={btn.chico}>
+      Continuar diagnóstico
+    </Link>
+  )}
+</td>
                   </tr>
                 ))}
               </Tabla>
