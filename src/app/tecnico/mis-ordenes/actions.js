@@ -40,6 +40,7 @@ export async function listarMisOrdenes() {
     .from("ordenes")
     .select(`
       id, codigo, estado, direccion_atencion, telefono_contacto, horario_preferido, fecha_asignacion,
+      atenciones ( id ),
       averia:averias (
         codigo, descripcion,
         tipo:tipos_averia ( nombre ),

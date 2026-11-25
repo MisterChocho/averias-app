@@ -1,4 +1,4 @@
-// HU12 · Consultar mis órdenes (JOJO-94) — Sneider Araneda
+// HU12 · Consultar mis órdenes (JOJO-94) + enlaces a HU14 Cerrar orden (JOJO-97) y aviso de HU24 — Sneider Araneda
 // El técnico ve solo sus órdenes Asignada o En atención, de la más antigua a la más reciente.
 import Link from "next/link";
 import { listarMisOrdenes } from "./actions";
@@ -12,7 +12,7 @@ function fecha(valor) {
 }
 
 export default async function TecnicoMisOrdenes({ searchParams }) {
-  const { atendida } = await searchParams;
+  const { atendida, asignada, cerrada } = await searchParams;
   const res = await listarMisOrdenes();
 
   return (
@@ -25,6 +25,18 @@ export default async function TecnicoMisOrdenes({ searchParams }) {
           res.ok && <Insignia tono="azul">{res.ordenes.length} {res.ordenes.length === 1 ? "orden" : "órdenes"}</Insignia>
         }
       />
+
+      {asignada && (
+        <Aviso tipo="exito">
+          Orden <strong>{asignada}</strong> asignada correctamente. Ya puedes atenderla.
+        </Aviso>
+      )}
+
+      {cerrada && (
+        <Aviso tipo="exito">
+          Orden <strong>{cerrada}</strong> cerrada correctamente.
+        </Aviso>
+      )}
 
       {atendida && (
         <Aviso tipo="exito">
@@ -62,7 +74,13 @@ export default async function TecnicoMisOrdenes({ searchParams }) {
                 <Dato etiqueta="Horario preferido" valor={o.horario_preferido} icono="reloj" />
                 <Dato etiqueta="Asignada" valor={fecha(o.fecha_asignacion)} />
               </dl>
-              <div className="mt-5 flex justify-end">
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                {o.estado === "En atención" && o.atenciones?.length > 0 && (
+                  <Link href={`/tecnico/mis-ordenes/cerrar?orden=${o.id}`} className={btn.chicoSecundario}>
+                    <Icono nombre="check" className="h-4 w-4" />
+                    Cerrar orden
+                  </Link>
+                )}
                 <Link href={`/tecnico/mis-ordenes/atencion?orden=${o.id}`} className={btn.chico}>
                   <Icono nombre="mas" className="h-4 w-4" />
                   {o.estado === "En atención" ? "Agregar atención" : "Registrar atención"}
