@@ -29,7 +29,9 @@ export async function listarTecnicos() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tecnicos")
-    .select("id, nombre_completo, dni, telefono, correo, estado, max_ordenes, perfil_id, ordenes ( estado )")
+    .select(
+      "id, nombre_completo, dni, telefono, correo, estado, max_ordenes, perfil_id, ordenes ( estado ), tecnico_zonas ( zona:zonas ( nombre ) )"
+    )
     .order("nombre_completo", { ascending: true });
 
   if (error) {
@@ -41,11 +43,12 @@ export async function listarTecnicos() {
     };
   }
 
-  const tecnicos = (data || []).map(({ perfil_id, ordenes, max_ordenes, ...t }) => {
+  const tecnicos = (data || []).map(({ perfil_id, ordenes, max_ordenes, tecnico_zonas, ...t }) => {
     const ordenesActivas = (ordenes || []).filter((o) => o.estado === "Asignada" || o.estado === "En atención").length;
     return {
       ...t,
       cuentaVinculada: Boolean(perfil_id),
+      zonas: (tecnico_zonas || []).map((z) => z.zona?.nombre).filter(Boolean),
       ordenesActivas,
       maxOrdenes: max_ordenes,
       cupo: Math.max(max_ordenes - ordenesActivas, 0),
