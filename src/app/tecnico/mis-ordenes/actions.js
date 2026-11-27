@@ -1,9 +1,9 @@
 "use server";
 
-// HU12 · Consultar mis órdenes (JOJO-94) y HU13 · Registrar atención (JOJO-95, JOJO-128) — Sneider Araneda
+// HU12 · Consultar mis órdenes (JOJO-94, JOJO-122) y HU13 · Registrar atención (JOJO-95, JOJO-128)
 //
-// Usa las tablas del esquema (ordenes, atenciones, tecnicos). Las políticas RLS ya limitan al técnico
-// a sus propias órdenes. Si Luis/Josep tienen sus acciones de HU12/HU13, se pueden reemplazar por estas.
+// Usa las tablas del esquema (ordenes, atenciones, tecnicos). El filtro por técnico se aplica
+// siempre desde la sesión autenticada (tecnicos.perfil_id = user.id).
 
 import { revalidatePath } from "next/cache";
 import { requireRol } from "@/lib/auth";
@@ -11,24 +11,32 @@ import { createClient } from "@/lib/supabase/server";
 
 const ESTADOS_VISIBLES = ["Asignada", "En atención"];
 
-// Técnico activo del usuario actual (null si no está dado de alta o está inactivo)
+// Técnico vinculado al usuario actual (distingue error de consulta vs. no registrado)
 async function tecnicoActual(supabase, userId) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("tecnicos")
     .select("id, nombre_completo, estado")
     .eq("perfil_id", userId)
     .maybeSingle();
-  return data;
+
+  if (error) {
+    console.error("[mis-ordenes] tecnicoActual", error.code, error.message);
+    return { tecnico: null, error };
+  }
+  return { tecnico: data, error: null };
 }
 
 // ---------------------------------------------------------------------
-// HU12 · Órdenes asignadas al técnico (Asignada o En atención)
+// HU12 · Órdenes asignadas al técnico (Asignada o En atención) — JOJO-122
 // ---------------------------------------------------------------------
 export async function listarMisOrdenes() {
   const { user } = await requireRol("tecnico");
   const supabase = await createClient();
 
-  const tecnico = await tecnicoActual(supabase, user.id);
+  const { tecnico, error: errorTecnico } = await tecnicoActual(supabase, user.id);
+  if (errorTecnico) {
+    return { ok: false, error: "No se pudieron cargar tus órdenes. Intenta nuevamente." };
+  }
   if (!tecnico) {
     return { ok: false, error: "Tu usuario no está registrado como técnico. Pide al gerente que te dé de alta." };
   }
